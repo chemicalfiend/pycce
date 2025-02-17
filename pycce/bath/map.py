@@ -3,7 +3,9 @@ from collections import defaultdict
 from collections.abc import MutableMapping
 
 import numpy as np
-from scipy.sparse.sputils import isintlike
+#from scipy.sparse.sputils import isintlike
+import operator
+
 
 two_layer_dict = lambda: defaultdict(dict)
 
@@ -73,6 +75,29 @@ class InteractionMap(MutableMapping):
     def __delitem__(self, key):
         a, b = _index(key)
 
+        try:
+            # Try to get indices - this will work if a and b are integer-like
+            operator.index(a)
+            operator.index(b)
+    
+            # If we get here, both a and b are integer-like
+            if a < b:
+                del self.mapping[a, b]
+            else:
+                del self.mapping[b, a]
+
+
+
+        except TypeError:
+            # Handle case when a and b are iterables
+            for j, k in zip(a, b):
+                if j < k:
+                    del self.mapping[j, k]
+                else:
+                    del self.mapping[k, j]
+            
+        
+        """
         if isintlike(a) and isintlike(b):
             if a < b:
                 del self.mapping[a, b]
@@ -84,6 +109,7 @@ class InteractionMap(MutableMapping):
                     del self.mapping[j, k]
                 else:
                     del self.mapping[k, j]
+        """
 
         self.indexes = None
         self._data = None
@@ -97,6 +123,36 @@ class InteractionMap(MutableMapping):
             value = value.reshape(-1, 3, 3)
         a, b = _index(key)
 
+        try:
+            # Try to get indices - this verifies both a and b are integer-like
+            operator.index(a)
+            operator.index(b)
+    
+            # If we get here, both a and b are integer-like
+            assert value.size == 9, 'Tensor should have shape of (3, 3)'
+            if a < b:
+                self.mapping[a, b] = value
+            else:
+                self.mapping[b, a] = value.T
+        except TypeError:
+            # Handle case when a and b are iterables
+            try:
+                if value.size == 9:
+                    for j, k in zip(a, b):
+                        if j < k:
+                            self.mapping[j, k] = value
+                        else:
+                            self.mapping[k, j] = value.T
+                    else:
+                        for j, k, v in zip(a, b, value):
+                            if j < k:
+                                self.mapping[j, k] = v
+                            else:
+                                self.mapping[k, j] = v.T
+            except TypeError as e:
+                raise TypeError('invalid index format') from e
+        
+        """
         if isintlike(a) and isintlike(b):
             assert value.size == 9, 'Tensor should have shape of (3, 3)'
             if a < b:
@@ -123,7 +179,8 @@ class InteractionMap(MutableMapping):
                 raise TypeError('invalid index format') from e
         self._data = None
         self.indexes = None
-
+        """
+        
     def shift(self, start, inplace=True):
         """
         Add an offset ``start`` to the indexes. If ``inplace`` is False, returns the copy of InteractionMap.
