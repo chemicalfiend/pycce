@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='pycce',
-    version='1.1.1',
+    version='1.1.1-mps',
     url='',
     license='',
     author='Nikita Onizhuk',
